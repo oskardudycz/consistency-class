@@ -37,37 +37,6 @@ internal class VirtualCreditCardDatabase
     }
 }
 
-internal record EventMetadata(
-    string StreamId,
-    string EventType,
-    Guid EventId,
-    int Version,
-    DateTime OccurredAt
-)
-{
-    public static EventMetadata From(Type eventType, string streamId, int version) =>
-        new(
-            streamId,
-            eventType.FullName ?? eventType.Name,
-            Guid.NewGuid(),
-            version,
-            DateTime.UtcNow
-        );
-}
-
-internal record EventEnvelope(
-    object Data,
-    EventMetadata Metadata)
-{
-    public static EventEnvelope From(string streamId, object eventObj, int version)
-    {
-        return new EventEnvelope(
-            eventObj,
-            EventMetadata.From(eventObj.GetType(), streamId, version)
-        );
-    }
-}
-
 internal class OwnershipDatabase
 {
     private readonly ConcurrentDictionary<CardId, Ownership> _ownerships = new();
