@@ -8,9 +8,13 @@ internal class WithdrawService(VirtualCreditCardDatabase virtualCreditCardDataba
             return Result.Failure;
 
         var card = virtualCreditCardDatabase.Find(cardId);
+        var expectedVersion = card.Version;
+
         var result = card.Withdraw(amount);
-        virtualCreditCardDatabase.Save(card);
-        return result;
+
+        return result == Result.Success
+            ? virtualCreditCardDatabase.Save(card, expectedVersion)
+            : result;
     }
 }
 

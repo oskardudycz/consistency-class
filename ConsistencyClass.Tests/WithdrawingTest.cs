@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace ConsistencyClass.Tests;
 
 using static CurrencyUnit;
@@ -118,6 +120,7 @@ public class WithdrawingTest
         {
             withdrawService.Withdraw(creditCard, Money.Of(1, USD), OSKAR);
         }
+
         // and
         closeCycleService.Close(creditCard);
 
@@ -207,10 +210,34 @@ public class WithdrawingTest
         Assert.Equal(Result.Failure, secondWithdrawResult);
     }
 
+    [Fact]
+    public async Task CantWithdrawConcurrently()
+    {
+        // given
+        var creditCard = NewCreditCard();
+        // and
+        addLimitService.AddLimit(creditCard, Money.Of(100, USD));
+        // and
+        ownershipService.AddAccess(creditCard, OSKAR);
+
+        var results = new ConcurrentBag<Result>();
+        var tasks = Enumerable.Range(0, 44).Select(_ => Task.Run(async () =>
+        {
+            await Task.Delay(100);
+            results.Add(withdrawService.Withdraw(creditCard, Money.Of(1, USD), OSKAR));
+        }));
+
+        await Task.WhenAll(tasks);
+
+        Assert.Contains(Result.Failure, results);
+        Assert.Contains(Result.Success, results);
+        Assert.True(AvailableLimit(creditCard).Amount < 100);
+    }
+
     private CardId NewCreditCard()
     {
         var virtualCreditCard = VirtualCreditCard.Create(CardId.Random());
-        creditCardDatabase.Save(virtualCreditCard);
+        creditCardDatabase.Save(virtualCreditCard, 0);
         return virtualCreditCard.Id;
     }
 
