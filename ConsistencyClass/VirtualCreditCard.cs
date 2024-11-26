@@ -11,6 +11,8 @@ public class VirtualCreditCard
     private int withdrawalsInCycle;
     private readonly List<VirtualCreditCardEvent> pendingEvents = new();
 
+    public int Version { get; private set; }
+
     private VirtualCreditCard() { }
 
     public static VirtualCreditCard WithLimit(Money limit)
@@ -57,8 +59,10 @@ public class VirtualCreditCard
         return result;
     }
 
-    private static VirtualCreditCard Evolve(VirtualCreditCard state, VirtualCreditCardEvent evt) =>
-        evt switch
+    private static VirtualCreditCard Evolve(VirtualCreditCard state, VirtualCreditCardEvent evt)
+    {
+        state.Version++;
+        return evt switch
         {
             CardCreated e => state.Created(e),
             LimitAssigned e => state.LimitAssigned(e),
@@ -67,6 +71,7 @@ public class VirtualCreditCard
             CycleClosed e => state.BillingCycleClosed(e),
             _ => state
         };
+    }
 
     private VirtualCreditCard Created(CardCreated evt)
     {
@@ -148,15 +153,15 @@ public record OwnerId(Guid Id)
     public static OwnerId Random() => new(Guid.NewGuid());
 }
 
-public record Ownership(HashSet<OwnerId> Owners)
+public record Ownership(HashSet<OwnerId> Owners, int Version): IVersioned
 {
     public int Size => Owners.Count;
 
     public static Ownership Of(params OwnerId[] owners) =>
-        new(new HashSet<OwnerId>(owners));
+        new(new HashSet<OwnerId>(owners), 0);
 
     public static Ownership Empty() =>
-        new(new HashSet<OwnerId>());
+        new(new HashSet<OwnerId>(), 0);
 
     public bool HasAccess(OwnerId ownerId) =>
         Owners.Contains(ownerId);
@@ -164,14 +169,14 @@ public record Ownership(HashSet<OwnerId> Owners)
     public Ownership AddAccess(OwnerId ownerId)
     {
         var newOwners = new HashSet<OwnerId>(Owners) { ownerId };
-        return new Ownership(newOwners);
+        return new Ownership(newOwners, Version + 1);
     }
 
     public Ownership Revoke(OwnerId ownerId)
     {
         var newOwners = new HashSet<OwnerId>(Owners);
         newOwners.Remove(ownerId);
-        return new Ownership(newOwners);
+        return new Ownership(newOwners, Version + 1);
     }
 }
 
