@@ -1,29 +1,38 @@
 namespace ConsistencyClass;
 
+using static VirtualCreditCardEvent;
 using static Result;
 
 internal class VirtualCreditCard
 {
-    public CardId Id { get; } = CardId.Random();
+    public CardId Id { get; private set; } = CardId.Empty;
     public Money AvailableLimit => limit.Available;
 
     private Limit limit = Limit.Unset;
     private int withdrawalsInCycle;
+    private readonly List<VirtualCreditCardEvent> pendingEvents = new();
 
-    public VirtualCreditCard() { }
+    private VirtualCreditCard() { }
 
     public static VirtualCreditCard WithLimit(Money limit)
     {
+        var cardId = CardId.Random();
+        List<VirtualCreditCardEvent> events = [new LimitAssigned(cardId, DateTimeOffset.UtcNow, limit)];
+        return Recreate(events);
+    }
+
+    public static VirtualCreditCard Recreate(IEnumerable<VirtualCreditCardEvent> stream) =>
+        stream.Aggregate(new VirtualCreditCard(), (card, evt) => card.Evolve(evt));
+
+    public static VirtualCreditCard Create(CardId cardId)
+    {
         var card = new VirtualCreditCard();
-        card.AssignLimit(limit);
+        card.Enqueue(new CardCreated(cardId, DateTimeOffset.UtcNow));
         return card;
     }
 
-    public Result AssignLimit(Money limit)
-    {
-        this.limit = Limit.Initial(limit);
-        return Success;
-    }
+    public Result AssignLimit(Money limit) =>
+        Success(new LimitAssigned(Id, DateTimeOffset.UtcNow, limit));
 
     public Result Withdraw(Money amount)
     {
@@ -33,25 +42,78 @@ internal class VirtualCreditCard
         if (withdrawalsInCycle >= 45)
             return Failure;
 
-        limit = limit.Use(amount);
-        withdrawalsInCycle++;
-        return Success;
+        return Success(new CardWithdrawn(Id, DateTimeOffset.UtcNow, amount));
     }
 
-    public Result Repay(Money amount)
+    public Result Repay(Money amount) =>
+        Success(new CardRepaid(Id, DateTimeOffset.UtcNow, amount));
+
+    public Result CloseCycle() =>
+        Success(new CycleClosed(Id, DateTimeOffset.UtcNow));
+
+    public List<VirtualCreditCardEvent> DequeuePendingEvents()
     {
-        limit = limit.TopUp(amount);
-        return Success;
+        var result = pendingEvents.ToList();
+        pendingEvents.Clear();
+        return result;
     }
 
-    public Result CloseCycle()
+    private VirtualCreditCard Evolve(VirtualCreditCardEvent evt) =>
+        evt switch
+        {
+            CardCreated e => Created(e),
+            LimitAssigned e => LimitAssigned(e),
+            CardWithdrawn e => CardWithdrawn(e),
+            CardRepaid e => CardRepaid(e),
+            CycleClosed e => BillingCycleClosed(e),
+            _ => this
+        };
+
+    private VirtualCreditCard Created(CardCreated evt)
+    {
+        Id = evt.CardId;
+        return this;
+    }
+
+    private VirtualCreditCard LimitAssigned(LimitAssigned evt)
+    {
+        limit = Limit.Initial(evt.Amount);
+        return this;
+    }
+
+    private VirtualCreditCard CardWithdrawn(CardWithdrawn evt)
+    {
+        limit = limit.Use(evt.Amount);
+        withdrawalsInCycle++;
+        return this;
+    }
+
+    private VirtualCreditCard CardRepaid(CardRepaid evt)
+    {
+        limit = limit.TopUp(evt.Amount);
+        return this;
+    }
+
+    private VirtualCreditCard BillingCycleClosed(CycleClosed evt)
     {
         withdrawalsInCycle = 0;
-        return Success;
+        return this;
+    }
+
+    private Result Success(VirtualCreditCardEvent evt)
+    {
+        Enqueue(evt);
+        return Result.Success;
+    }
+
+    private void Enqueue(VirtualCreditCardEvent evt)
+    {
+        Evolve(evt);
+        pendingEvents.Add(evt);
     }
 }
 
-public enum Result
+internal enum Result
 {
     Success,
     Failure
@@ -59,6 +121,8 @@ public enum Result
 
 internal record CardId(Guid Id)
 {
+    public static CardId Empty => new(Guid.Empty);
+
     public static CardId Random() => new(Guid.NewGuid());
 }
 
@@ -90,10 +154,10 @@ internal record Ownership(HashSet<OwnerId> Owners)
     public int Size => Owners.Count;
 
     public static Ownership Of(params OwnerId[] owners) =>
-        new(new HashSet<OwnerId>(owners));
+        new([..owners]);
 
     public static Ownership Empty() =>
-        new(new HashSet<OwnerId>());
+        new([]);
 
     public bool HasAccess(OwnerId ownerId) =>
         Owners.Contains(ownerId);
@@ -110,4 +174,19 @@ internal record Ownership(HashSet<OwnerId> Owners)
         newOwners.Remove(ownerId);
         return new Ownership(newOwners);
     }
+}
+
+internal abstract record VirtualCreditCardEvent
+{
+    public record CardCreated(CardId CardId, DateTimeOffset CreatedAt): VirtualCreditCardEvent;
+
+    public record CardRepaid(CardId CardId, DateTimeOffset RepaidAt, Money Amount): VirtualCreditCardEvent;
+
+    public record LimitAssigned(CardId CardId, DateTimeOffset AssignedAt, Money Amount): VirtualCreditCardEvent;
+
+    public record CardWithdrawn(CardId CardId, DateTimeOffset WithdrawnAt, Money Amount): VirtualCreditCardEvent;
+
+    public record CycleClosed(CardId CardId, DateTimeOffset ClosedAt): VirtualCreditCardEvent;
+
+    private VirtualCreditCardEvent() { }
 }
