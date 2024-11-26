@@ -5,8 +5,12 @@ internal class CloseCycleService(VirtualCreditCardDatabase virtualCreditCardData
     public Result Close(CardId cardId)
     {
         var card = virtualCreditCardDatabase.Find(cardId);
+        var expectedVersion = card.Version;
+
         var result = card.CloseCycle();
-        virtualCreditCardDatabase.Save(card);
-        return result;
+
+        return result == Result.Success
+            ? virtualCreditCardDatabase.Save(card, expectedVersion)
+            : result;
     }
 }

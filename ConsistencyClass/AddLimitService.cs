@@ -5,9 +5,12 @@ internal class AddLimitService(VirtualCreditCardDatabase virtualCreditCardDataba
     public Result AddLimit(CardId cardId, Money limit)
     {
         var card = virtualCreditCardDatabase.Find(cardId);
+        var expectedVersion = card.Version;
+
         var result = card.AssignLimit(limit);
-        virtualCreditCardDatabase.Save(card);
-        return result;
+
+        return result == Result.Success
+            ? virtualCreditCardDatabase.Save(card, expectedVersion)
+            : result;
     }
 }
-

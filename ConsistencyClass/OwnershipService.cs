@@ -5,26 +5,25 @@ internal class OwnershipService(OwnershipDatabase ownershipDatabase)
     public Result AddAccess(CardId cardId, OwnerId ownerId)
     {
         var ownership = ownershipDatabase.Find(cardId);
+        var expectedVersion = ownership.Version;
 
         if (ownership.Size >= 2)
         {
             return Result.Failure;
         }
 
-        var updatedOwnership = ownership.AddAccess(ownerId);
-        ownershipDatabase.Save(cardId, updatedOwnership);
+        ownership = ownership.AddAccess(ownerId);
 
-        return Result.Success;
+        return ownershipDatabase.Save(cardId, ownership, expectedVersion);
     }
 
     public Result RevokeAccess(CardId cardId, OwnerId ownerId)
     {
         var ownership = ownershipDatabase.Find(cardId);
-        var updatedOwnership = ownership.Revoke(ownerId);
+        var expectedVersion = ownership.Version;
 
-        ownershipDatabase.Save(cardId, updatedOwnership);
+        ownership = ownership.Revoke(ownerId);
 
-        return Result.Success;
+        return ownershipDatabase.Save(cardId, ownership, expectedVersion);
     }
 }
-

@@ -2,7 +2,7 @@ namespace ConsistencyClass;
 
 using static VirtualCreditCardEvent;
 
-public class VirtualCreditCard
+public class VirtualCreditCard: IVersioned
 {
     public CardId Id { get; private set; } = CardId.Empty;
     public Money AvailableLimit => limit.Available;
@@ -10,6 +10,8 @@ public class VirtualCreditCard
     private Limit limit = Limit.Unset;
     private int withdrawalsInCycle;
     private readonly List<VirtualCreditCardEvent> pendingEvents = new();
+
+    public int Version { get; private set; }
 
     private VirtualCreditCard() { }
 
@@ -57,8 +59,10 @@ public class VirtualCreditCard
         return result;
     }
 
-    private VirtualCreditCard Evolve(VirtualCreditCardEvent evt) =>
-        evt switch
+    private VirtualCreditCard Evolve(VirtualCreditCardEvent evt)
+    {
+        Version++;
+        return evt switch
         {
             CardCreated e => Created(e),
             LimitAssigned e => LimitAssigned(e),
@@ -67,6 +71,7 @@ public class VirtualCreditCard
             CycleClosed e => BillingCycleClosed(e),
             _ => this
         };
+    }
 
     private VirtualCreditCard Created(CardCreated evt)
     {
@@ -148,15 +153,15 @@ public record OwnerId(Guid Id)
     public static OwnerId Random() => new(Guid.NewGuid());
 }
 
-public record Ownership(HashSet<OwnerId> Owners)
+public record Ownership(HashSet<OwnerId> Owners, int Version): IVersioned
 {
     public int Size => Owners.Count;
 
     public static Ownership Of(params OwnerId[] owners) =>
-        new(new HashSet<OwnerId>(owners));
+        new(new HashSet<OwnerId>(owners), 0);
 
     public static Ownership Empty() =>
-        new(new HashSet<OwnerId>());
+        new(new HashSet<OwnerId>(), 0);
 
     public bool HasAccess(OwnerId ownerId) =>
         Owners.Contains(ownerId);
@@ -164,14 +169,14 @@ public record Ownership(HashSet<OwnerId> Owners)
     public Ownership AddAccess(OwnerId ownerId)
     {
         var newOwners = new HashSet<OwnerId>(Owners) { ownerId };
-        return new Ownership(newOwners);
+        return new Ownership(newOwners, Version + 1);
     }
 
     public Ownership Revoke(OwnerId ownerId)
     {
         var newOwners = new HashSet<OwnerId>(Owners);
         newOwners.Remove(ownerId);
-        return new Ownership(newOwners);
+        return new Ownership(newOwners, Version + 1);
     }
 }
 
