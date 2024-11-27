@@ -1,17 +1,18 @@
 namespace ConsistencyClass.Tests;
 
-using static Result;
+using Xunit;
 using static CurrencyUnit;
+using static Result;
 
-public class VirtualCreditCardTest
+public class BillingCycleTest
 {
     [Fact]
     public void CanWithdraw()
     {
-        // given
-        var creditCard = VirtualCreditCard.WithLimit(Money.Of(100, USD));
+        // Given
+        var creditCard = BillingCycle.WithLimit(Money.Of(100, USD));
 
-        // when
+        // When
         var result = creditCard.Withdraw(Money.Of(50, USD));
 
         // Then
@@ -22,13 +23,13 @@ public class VirtualCreditCardTest
     [Fact]
     public void CantWithdrawMoreThanLimit()
     {
-        // given
-        var creditCard = VirtualCreditCard.WithLimit(Money.Of(100, USD));
+        // Given
+        var creditCard = BillingCycle.WithLimit(Money.Of(100, USD));
 
-        // when
+        // When
         var result = creditCard.Withdraw(Money.Of(500, USD));
 
-        // then
+        // Then
         Assert.Equal(Failure, result);
         Assert.Equal(Money.Of(100, USD), creditCard.AvailableLimit);
     }
@@ -36,18 +37,19 @@ public class VirtualCreditCardTest
     [Fact]
     public void CantWithdrawMoreThan45TimesInCycle()
     {
-        // given
-        var creditCard = VirtualCreditCard.WithLimit(Money.Of(100, USD));
-        // and
+        // Given
+        var creditCard = BillingCycle.WithLimit(Money.Of(100, USD));
+
+        // And
         for (var i = 1; i <= 45; i++)
         {
             creditCard.Withdraw(Money.Of(1, USD));
         }
 
-        // when
+        // When
         var result = creditCard.Withdraw(Money.Of(1, USD));
 
-        //then
+        // Then
         Assert.Equal(Failure, result);
         Assert.Equal(Money.Of(55, USD), creditCard.AvailableLimit);
     }
@@ -55,36 +57,40 @@ public class VirtualCreditCardTest
     [Fact]
     public void CanRepay()
     {
-        //given
-        var creditCard = VirtualCreditCard.WithLimit(Money.Of(100, USD));
-        //and
+        // Given
+        var creditCard = BillingCycle.WithLimit(Money.Of(100, USD));
+
+        // And
         creditCard.Withdraw(Money.Of(50, USD));
-        //when
+
+        // When
         var result = creditCard.Repay(Money.Of(40, USD));
-        //then
+
+        // Then
         Assert.Equal(Success, result);
         Assert.Equal(Money.Of(90, USD), creditCard.AvailableLimit);
     }
 
     [Fact]
-    public void CanWithdrawInNextCycle()
+    public void CannotWithdrawInClosedCycle()
     {
-        // given
-        var creditCard = VirtualCreditCard.WithLimit(Money.Of(100, USD));
-        // and
+        // Given
+        var creditCard = BillingCycle.WithLimit(Money.Of(100, USD));
+
+        // And
         for (var i = 1; i <= 45; i++)
         {
             creditCard.Withdraw(Money.Of(1, USD));
         }
 
-        // and
+        // And
         creditCard.CloseCycle();
 
-        // when
+        // When
         var result = creditCard.Withdraw(Money.Of(1, USD));
 
-        // then
-        Assert.Equal(Success, result);
-        Assert.Equal(Money.Of(54, USD), creditCard.AvailableLimit);
+        // Then
+        Assert.Equal(Failure, result);
     }
 }
+

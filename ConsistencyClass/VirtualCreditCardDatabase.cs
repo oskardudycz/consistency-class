@@ -1,12 +1,10 @@
 namespace ConsistencyClass;
 
-internal class VirtualCreditCardDatabase
+internal class VirtualCreditCardDatabase(EventStore eventStore)
 {
-    private readonly EventStore eventStore = new();
-
     public Result Save(VirtualCreditCard card, int expectedVersion)
     {
-        var streamId = card.Id.Id.ToString();
+        var streamId = card.Id.ContractId.ToString();
 
         return eventStore.AppendToStream(
             streamId,
@@ -17,11 +15,34 @@ internal class VirtualCreditCardDatabase
 
     public VirtualCreditCard Find(CardId cardId)
     {
-        var streamId = cardId.Id.ToString();
+        var streamId = cardId.ContractId.ToString();
 
         var events = eventStore.ReadEvents<VirtualCreditCardEvent>(streamId);
 
         return VirtualCreditCard.Recreate(events);
+    }
+}
+
+internal class BillingCycleDatabase(EventStore eventStore)
+{
+    public Result Save(BillingCycle cycle, int expectedVersion)
+    {
+        var streamId = cycle.Id.ToString();
+
+        return eventStore.AppendToStream(
+            streamId,
+            cycle.DequeuePendingEvents(),
+            expectedVersion
+        );
+    }
+
+    public BillingCycle Find(BillingCycleId cycleId)
+    {
+        var streamId = cycleId.ToString();
+
+        var events = eventStore.ReadEvents<BillingCycleEvent>(streamId);
+
+        return BillingCycle.Recreate(events);
     }
 }
 
@@ -30,8 +51,8 @@ internal class OwnershipDatabase
     private readonly DatabaseCollection<Ownership> ownerships = Database.Collection<Ownership>();
 
     public Result Save(CardId cardId, Ownership ownership, int expectedVersion) =>
-        ownerships.Save(cardId.Id.ToString(), ownership, expectedVersion);
+        ownerships.Save(cardId.ToString(), ownership, expectedVersion);
 
     public Ownership Find(CardId cardId) =>
-        ownerships.Find(cardId.Id.ToString()) ?? Ownership.Empty();
+        ownerships.Find(cardId.ToString()) ?? Ownership.Empty();
 }

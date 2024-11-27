@@ -1,16 +1,16 @@
 namespace ConsistencyClass;
 
-internal class RepayService(VirtualCreditCardDatabase virtualCreditCardDatabase)
+internal class RepayService(BillingCycleDatabase billingCycleDatabase)
 {
-    public Result Repay(CardId cardId, Money amount)
+    public Result Repay(BillingCycleId cycleId, Money amount)
     {
-        var card = virtualCreditCardDatabase.Find(cardId);
-        var expectedVersion = card.Version;
+        var billingCycle = billingCycleDatabase.Find(cycleId);
+        var expectedVersion = billingCycle.Version;
 
-        var result = card.Repay(amount);
+        var result = billingCycle.Repay(amount);
 
         return result == Result.Success
-            ? virtualCreditCardDatabase.Save(card, expectedVersion)
+            ? billingCycleDatabase.Save(billingCycle, expectedVersion)
             : result;
     }
 }

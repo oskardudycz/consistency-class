@@ -1,20 +1,19 @@
 namespace ConsistencyClass;
 
-internal class WithdrawService(VirtualCreditCardDatabase virtualCreditCardDatabase, OwnershipDatabase ownershipDatabase)
+internal class WithdrawService(BillingCycleDatabase billingCycleDatabase, OwnershipDatabase ownershipDatabase)
 {
-    public Result Withdraw(CardId cardId, Money amount, OwnerId ownerId)
+    public Result Withdraw(BillingCycleId cycleId, Money amount, OwnerId ownerId)
     {
-        if (!ownershipDatabase.Find(cardId).HasAccess(ownerId))
+        if (!ownershipDatabase.Find(cycleId.CardId).HasAccess(ownerId))
             return Result.Failure;
 
-        var card = virtualCreditCardDatabase.Find(cardId);
-        var expectedVersion = card.Version;
+        var billingCycle = billingCycleDatabase.Find(cycleId);
+        var expectedVersion = billingCycle.Version;
 
-        var result = card.Withdraw(amount);
+        var result = billingCycle.Withdraw(amount);
 
         return result == Result.Success
-            ? virtualCreditCardDatabase.Save(card, expectedVersion)
+            ? billingCycleDatabase.Save(billingCycle, expectedVersion)
             : result;
     }
 }
-

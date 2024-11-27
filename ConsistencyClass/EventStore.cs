@@ -9,6 +9,7 @@ using static RecordWithVersion;
 internal class EventStore
 {
     private readonly DatabaseCollection<EventStream> streams = Database.Collection<EventStream>();
+    public List<Action<object>> Subscribers { get; } = [];
 
     public List<T> ReadEvents<T>(string streamId) =>
         ExistingEventStreamOrEmpty(streamId)
@@ -23,7 +24,30 @@ internal class EventStore
             EventEnvelope.From(streamId, e, ++version)
         ).ToList();
 
-        return streams.Save(streamId, stream.Append(newEvents), expectedVersion);
+        var result = streams.Save(streamId, stream.Append(newEvents), expectedVersion);
+
+        if (result == Result.Success)
+        {
+            // Note: this typically happens asynchronously
+            // to not impact accidentally storing events
+            Publish(newEvents);
+        }
+
+        return result;
+    }
+
+    public void Subscribe(Action<object> subscriber) =>
+        Subscribers.Add(subscriber);
+
+    private void Publish(List<EventEnvelope> events)
+    {
+        foreach (var handler in Subscribers)
+        {
+            foreach (var evt in events)
+            {
+                handler(evt.Data);
+            }
+        }
     }
 
     private EventStream ExistingEventStreamOrEmpty(string streamId) =>
