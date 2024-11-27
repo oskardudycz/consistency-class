@@ -165,22 +165,20 @@ public class DatabaseTest
     }
 
     [Fact]
-    public async Task CantUpdateConcurrently()
+    public void CantUpdateConcurrently()
     {
         var collection = Database.Collection<DummyVersionedEntity>();
         var id = Guid.NewGuid().ToString();
 
         var results = new ConcurrentBag<Result>();
-        var tasks = Enumerable.Range(0, 1000).Select(_ => Task.Run(() =>
+        Parallel.For(0, 10000, _ =>
         {
             var entity = collection.Find(id) ?? new DummyVersionedEntity(id, 0);
             results.Add(collection.Save(id, entity));
-        }));
-
-        await Task.WhenAll(tasks);
+        });
 
         Assert.Contains(Result.Failure, results);
-        Assert.True((collection.Find(id)?.Version ?? 0) < 1000);
+        Assert.True((collection.Find(id)?.Version ?? 0) < 10000);
     }
 }
 
