@@ -1,25 +1,53 @@
 namespace ConsistencyClass;
 
-public class Money: IEquatable<Money>, IComparable<Money>
+internal record CurrencyUnit: IComparable<CurrencyUnit>
 {
-    public decimal Amount { get; }
-    public string Currency { get; }
-    private Money(decimal amount, string currency)
+    public static readonly CurrencyUnit Unset = new("Unset");
+    public static readonly CurrencyUnit USD = OfCode("USD");
+    public static readonly CurrencyUnit EUR = OfCode("EUR");
+    public string Code { get; }
+
+    public static CurrencyUnit OfCode(string code) => !string.IsNullOrWhiteSpace(code)
+        ? new CurrencyUnit(code)
+        : throw new ArgumentException($"Currency {nameof(code)} cannot be null or empty.", nameof(code));
+
+    private CurrencyUnit(string code) =>
+        Code = code.ToUpperInvariant();
+
+    public override string ToString() => Code;
+
+    public int CompareTo(CurrencyUnit? other)
     {
-        if (Amount < 0)
-            throw new ArgumentOutOfRangeException(nameof(Amount), "Amount cannot be negative.");
+        if (ReferenceEquals(this, other)) return 0;
+        if (other is null) return 1;
+        return string.Compare(Code, other.Code, StringComparison.Ordinal);
+    }
+}
 
-        if (string.IsNullOrWhiteSpace(currency))
-            throw new ArgumentException("currency cannot be null or empty.", nameof(Currency));
+internal record Money: IComparable<Money>
+{
+    public static Money Unset = new(0, CurrencyUnit.Unset);
+    public static Money Zero(CurrencyUnit currency) => new(0, currency);
 
-        Currency = currency.ToUpperInvariant();
+    public decimal Amount { get; }
+    public CurrencyUnit Currency { get; }
+
+    private Money(decimal amount, CurrencyUnit currency)
+    {
+        Currency = currency;
         Amount = amount;
     }
 
-    public static Money Of(decimal amount, string currency) => new(amount, currency);
+    public static Money Of(decimal amount, CurrencyUnit currency)
+    {
+        if (amount < 0)
+            throw new ArgumentOutOfRangeException(nameof(amount), "Amount cannot be negative.");
 
-    public static Money Unset = new(0, "Unset");
-    public static Money Zero(string currency) => new(0, currency);
+        if (currency == CurrencyUnit.Unset)
+            throw new ArgumentException("Currency cannot be unset.", nameof(currency));
+
+        return new Money(amount, currency);
+    }
 
     public Money Add(Money other)
     {
@@ -41,6 +69,8 @@ public class Money: IEquatable<Money>, IComparable<Money>
 
     public bool IsPositiveOrZero => Amount >= 0;
 
+    public bool IsZero => Amount == 0;
+
     private void EnsureSameCurrency(Money other)
     {
         if (Currency != other.Currency)
@@ -49,33 +79,12 @@ public class Money: IEquatable<Money>, IComparable<Money>
 
     public override string ToString() => $"{Amount:0.00} {Currency}";
 
-    public bool Equals(Money? other)
-    {
-        if (other is null) return false;
-        if (ReferenceEquals(this, other)) return true;
-        return Amount == other.Amount && Currency == other.Currency;
-    }
-
-    public override bool Equals(object? obj)
-    {
-        if (obj is null) return false;
-        if (ReferenceEquals(this, obj)) return true;
-        if (obj.GetType() != GetType()) return false;
-        return Equals((Money)obj);
-    }
-
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(Amount, Currency);
-    }
-
     public int CompareTo(Money? other)
     {
         if (ReferenceEquals(this, other)) return 0;
         if (other is null) return 1;
         var amountComparison = Amount.CompareTo(other.Amount);
         if (amountComparison != 0) return amountComparison;
-        return string.Compare(Currency, other.Currency, StringComparison.Ordinal);
+        return Currency.CompareTo(other.Currency);
     }
 }
-

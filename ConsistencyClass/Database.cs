@@ -14,17 +14,17 @@ interface IVersionedWithAutoIncrement : IVersioned
     public void SetVersion(int version);
 }
 
-public record RecordWithVersion(object? Record, int Version)
+internal record RecordWithVersion(object? Record, int Version)
 {
     public static readonly RecordWithVersion NoRecord = new(null, 0);
 }
 
-public class Database
+internal class Database
 {
     public static DatabaseCollection<T> Collection<T>() => new();
 }
 
-public class DatabaseCollection<T>
+internal class DatabaseCollection<T>
 {
     private readonly ConcurrentDictionary<string, RecordWithVersion> entries = new();
 
