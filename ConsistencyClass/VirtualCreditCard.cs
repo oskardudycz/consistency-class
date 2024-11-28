@@ -22,7 +22,7 @@ internal class VirtualCreditCard
     }
 
     public static VirtualCreditCard Recreate(IEnumerable<VirtualCreditCardEvent> stream) =>
-        stream.Aggregate(new VirtualCreditCard(), (card, evt) => card.Evolve(evt));
+        null!;
 
     public static VirtualCreditCard Create(CardId cardId)
     {
@@ -57,17 +57,6 @@ internal class VirtualCreditCard
         pendingEvents.Clear();
         return result;
     }
-
-    private VirtualCreditCard Evolve(VirtualCreditCardEvent evt) =>
-        evt switch
-        {
-            CardCreated e => Created(e),
-            LimitAssigned e => LimitAssigned(e),
-            CardWithdrawn e => CardWithdrawn(e),
-            CardRepaid e => CardRepaid(e),
-            CycleClosed e => BillingCycleClosed(e),
-            _ => this
-        };
 
     private VirtualCreditCard Created(CardCreated evt)
     {
@@ -108,7 +97,6 @@ internal class VirtualCreditCard
 
     private void Enqueue(VirtualCreditCardEvent evt)
     {
-        Evolve(evt);
         pendingEvents.Add(evt);
     }
 }
