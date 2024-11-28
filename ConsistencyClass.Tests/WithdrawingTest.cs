@@ -237,7 +237,7 @@ public class WithdrawingTest
     private CardId NewCreditCard()
     {
         var virtualCreditCard = VirtualCreditCard.Create(CardId.Random());
-        creditCardDatabase.Save(virtualCreditCard, 0);
+        creditCardDatabase.Save(virtualCreditCard);
         return virtualCreditCard.Id;
     }
 

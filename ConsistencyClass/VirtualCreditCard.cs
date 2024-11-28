@@ -12,8 +12,6 @@ internal class VirtualCreditCard
     private int withdrawalsInCycle;
     private readonly List<VirtualCreditCardEvent> pendingEvents = new();
 
-    public int Version { get; private set; }
-
     private VirtualCreditCard() { }
 
     public static VirtualCreditCard WithLimit(Money limit)
@@ -62,7 +60,6 @@ internal class VirtualCreditCard
 
     private static VirtualCreditCard Evolve(VirtualCreditCard state, VirtualCreditCardEvent evt)
     {
-        state.Version++;
         return evt switch
         {
             CardCreated e => state.Created(e),
@@ -154,15 +151,15 @@ internal record OwnerId(Guid Id)
     public static OwnerId Random() => new(Guid.NewGuid());
 }
 
-internal record Ownership(HashSet<OwnerId> Owners, int Version): IVersioned
+internal record Ownership(HashSet<OwnerId> Owners)
 {
     public int Size => Owners.Count;
 
     public static Ownership Of(params OwnerId[] owners) =>
-        new([..owners], 0);
+        new([..owners]);
 
     public static Ownership Empty() =>
-        new([], 0);
+        new([]);
 
     public bool HasAccess(OwnerId ownerId) =>
         Owners.Contains(ownerId);
@@ -170,14 +167,14 @@ internal record Ownership(HashSet<OwnerId> Owners, int Version): IVersioned
     public Ownership AddAccess(OwnerId ownerId)
     {
         var newOwners = new HashSet<OwnerId>(Owners) { ownerId };
-        return new Ownership(newOwners, Version + 1);
+        return new Ownership(newOwners);
     }
 
     public Ownership Revoke(OwnerId ownerId)
     {
         var newOwners = new HashSet<OwnerId>(Owners);
         newOwners.Remove(ownerId);
-        return new Ownership(newOwners, Version + 1);
+        return new Ownership(newOwners);
     }
 }
 

@@ -4,14 +4,13 @@ internal class VirtualCreditCardDatabase
 {
     private readonly EventStore eventStore = new();
 
-    public Result Save(VirtualCreditCard card, int expectedVersion)
+    public Result Save(VirtualCreditCard card)
     {
         var streamId = card.Id.Id.ToString();
 
         return eventStore.AppendToStream(
             streamId,
-            card.DequeuePendingEvents(),
-            expectedVersion
+            card.DequeuePendingEvents()
         );
     }
 
@@ -29,8 +28,8 @@ internal class OwnershipDatabase
 {
     private readonly DatabaseCollection<Ownership> ownerships = Database.Collection<Ownership>();
 
-    public Result Save(CardId cardId, Ownership ownership, int expectedVersion) =>
-        ownerships.Save(cardId.Id.ToString(), ownership, expectedVersion);
+    public Result Save(CardId cardId, Ownership ownership) =>
+        ownerships.Save(cardId.Id.ToString(), ownership);
 
     public Ownership Find(CardId cardId) =>
         ownerships.Find(cardId.Id.ToString()) ?? Ownership.Empty();
